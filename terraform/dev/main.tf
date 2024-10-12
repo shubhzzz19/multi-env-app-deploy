@@ -5,10 +5,14 @@ provider "aws" {
 # Create an S3 bucket for logs
 resource "aws_s3_bucket" "log_bucket" {
     bucket = "my-app-log-bucket-${var.environment}-123456"  # Unique bucket name for each environment
-    acl    = "private"
-    
-    versioning {
-        enabled = true
+}
+
+# Separate S3 versioning configuration (to avoid deprecation warnings)
+resource "aws_s3_bucket_versioning" "log_bucket_versioning" {
+    bucket = aws_s3_bucket.log_bucket.id
+
+    versioning_configuration {
+        status = "Enabled"
     }
 }
 
@@ -36,12 +40,12 @@ resource "aws_iam_role" "lambda_role" {
     assume_role_policy = jsonencode({
         Version = "2012-10-17"
         Statement = [{
-            Action    = "sts:AssumeRole"
-            Principal = {
-                Service = "lambda.amazonaws.com"
-            }
-            Effect   = "Allow"
-            Sid      = ""
+        Action    = "sts:AssumeRole"
+        Principal = {
+            Service = "lambda.amazonaws.com"
+        }
+        Effect   = "Allow"
+        Sid      = ""
         }]
     })
 }
@@ -55,13 +59,15 @@ resource "aws_iam_role_policy_attachment" "lambda_policy_attachment" {
 # Create AWS RDS for PostgreSQL
 resource "aws_db_instance" "app_db" {
     identifier              = "my-app-db-${var.environment}"
-    engine                 = "postgres"
-    instance_class         = "db.t2.micro"
+    engine                  = "postgres"
+    engine_version          = "16.4"  # Set to the latest supported version
+    instance_class          = "db.t3.micro"  # Cost-effective instance type
     allocated_storage       = 20
-    db_name                = var.db_config[var.environment].db_name
-    username               = var.db_config[var.environment].username
-    password               = var.db_config[var.environment].password
-    skip_final_snapshot    = true
+    db_name                 = var.db_config[var.environment].db_name
+    username                = var.db_config[var.environment].username
+    password                = var.db_config[var.environment].password
+    parameter_group_name    = "default.postgres16"  # Update to the default parameter group for PostgreSQL 16
+    skip_final_snapshot     = true
     publicly_accessible     = true
 }
 
@@ -69,17 +75,17 @@ resource "aws_db_instance" "app_db" {
 resource "aws_lambda_function" "message_processor" {
     function_name = "MessageProcessor${title(var.environment)}"
     s3_bucket     = aws_s3_bucket.log_bucket.bucket
-    s3_key        = "./lambda.zip"  # The ZIP file containing your Lambda function code
+    s3_key        = "lambda.zip"  # Ensure that this is the correct path to your Lambda function code ZIP file
     handler       = "lambda_function.lambda_handler"
     runtime       = "python3.9"
     role          = aws_iam_role.lambda_role.arn
 
     environment {
         variables = {
-            DB_HOST     = aws_db_instance.app_db.endpoint
-            DB_NAME     = var.db_config[var.environment].db_name
-            DB_USER     = var.db_config[var.environment].username
-            DB_PASSWORD = var.db_config[var.environment].password
+        DB_HOST     = aws_db_instance.app_db.endpoint
+        DB_NAME     = var.db_config[var.environment].db_name
+        DB_USER     = var.db_config[var.environment].username
+        DB_PASSWORD = var.db_config[var.environment].password
         }
     }
 }
