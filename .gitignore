@@ -1,0 +1,20 @@
+# Ignore Python package files
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+
+# Ignore all files in the psycopg2 directory
+terraform/dev/psycopg2/*
+
+# Ignore the Terraform lock file
+terraform/dev/.terraform.lock.hcl
+
+# Ignore specific files in the .terraform/providers directory
+terraform/dev/.terraform/providers/**/LICENSE.txt
+
+# Ignore the large lambda.zip file
+terraform/dev/lambda.zip
+
+# Ignore the large AWS Terraform provider executable
+terraform/dev/.terraform/providers/registry.terraform.io/hashicorp/aws/5.71.0/windows_386/terraform-provider-aws_v5.71.0_x5.exe
